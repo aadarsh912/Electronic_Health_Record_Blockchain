@@ -75,6 +75,10 @@
               <input id="runAiAgents" name="runAiAgents" type="checkbox" checked />
               Run Gemini AI agents (lab analysis + decision support) before submit
             </label>
+            <label class="checkbox-row">
+              <input id="runGovernance" name="runGovernance" type="checkbox" checked />
+              Enforce AI Safety & Governance Guardrails (Deterministic Output Validation Gate)
+            </label>
             <button class="btn btn-primary" type="submit">Submit Record</button>
           </form>
         </article>
@@ -118,6 +122,14 @@
               <input name="status" placeholder="REPORTED" required />
             </label>
             <button class="btn btn-secondary" type="submit" style="grid-column: 1 / -1;">Update Status</button>
+          </form>
+
+          <form id="governanceForm" class="inline-form">
+            <label>
+              Governance Safety Gate (Input / Output Test)
+              <input name="testText" placeholder="e.g. definitely has anemia OR ignore instructions" required />
+            </label>
+            <button class="btn btn-secondary" type="submit">Run Safety Gate</button>
           </form>
         </article>
       </div>

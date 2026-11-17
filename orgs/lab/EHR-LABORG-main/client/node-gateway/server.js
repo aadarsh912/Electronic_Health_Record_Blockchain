@@ -12,6 +12,18 @@ const {
   runAgenticClinicalAnalysis,
 } = require('./ai-agent');
 const {
+  reviewLegacyAiOutput,
+  runGovernanceAgent,
+  runPreGuardrails,
+  runPostGuardrails,
+  DECISION,
+} = require('./agents/governance-agent');
+const {
+  CONFIDENCE_LEVELS,
+  PRE_GUARDRAILS,
+  POST_GUARDRAILS,
+} = require('./agents/safety-rules');
+const {
   createLabResult,
   getAllLabResults,
   getLabResultsByPatient,
@@ -233,6 +245,20 @@ app.post('/api/ai/analyze', async (req, res, next) => {
       reportTextSource: req.body.reportTextSource,
     });
 
+    const runGovernance = parseBooleanValue(req.body.runGovernance, true);
+    let governance = null;
+    if (runGovernance) {
+      governance = reviewLegacyAiOutput(ai, {
+        runId: req.body.resultId || `AI-${Date.now()}`,
+        patientId: req.body.patientId,
+        rawInputs: {
+          resultData: req.body.resultData,
+          reportText: req.body.reportText,
+          testCode: req.body.testCode,
+        },
+      });
+    }
+
     let aiIpfs = null;
     if (req.body.persistToIpfs !== false) {
       aiIpfs = await addJsonToIpfs(ai, {
@@ -245,6 +271,7 @@ app.post('/api/ai/analyze', async (req, res, next) => {
       historyCount: patientHistory.length,
       warnings,
       ai,
+      governance: governance ? governance.output : null,
       aiIpfs,
     });
   } catch (error) {
@@ -391,6 +418,7 @@ app.post('/api/records/ipfs', uploadReportFile.single('reportFile'), async (req,
 
     let ai = null;
     let aiIpfs = null;
+    let governance = null;
     if (runAiAgents) {
       const resultDataForAi = parsedResultData || {
         reportFile: reportFileIpfs
@@ -412,6 +440,19 @@ app.post('/api/records/ipfs', uploadReportFile.single('reportFile'), async (req,
           ? (req.file.originalname || reportFileIpfs.name)
           : undefined,
       });
+
+      const runGovernance = parseBooleanValue(req.body.runGovernance, true);
+      if (runGovernance) {
+        governance = reviewLegacyAiOutput(ai, {
+          runId: resultId,
+          patientId: req.body.patientId,
+          rawInputs: {
+            resultData: parsedResultData,
+            reportText: extractedReportText,
+            testCode: req.body.testCode,
+          },
+        });
+      }
 
       aiIpfs = await addJsonToIpfs(ai, {
         fileName: `${resultId || 'labresult'}-ai-summary.json`,
@@ -461,6 +502,15 @@ app.post('/api/records/ipfs', uploadReportFile.single('reportFile'), async (req,
         warning: ai.warning,
         disclaimer: ai.disclaimer,
       };
+
+      if (governance) {
+        chainResultData.governance = governance.output;
+      }
+    }
+
+    let initialStatus = trimmedField(req.body.status) || 'PENDING';
+    if (governance && governance.output && governance.output.requiresHumanReview) {
+      initialStatus = 'PENDING_REVIEW';
     }
 
     const response = await createLabResult(
@@ -469,7 +519,7 @@ app.post('/api/records/ipfs', uploadReportFile.single('reportFile'), async (req,
         patientId: trimmedField(req.body.patientId),
         testCode: trimmedField(req.body.testCode),
         collectedAt: trimmedField(req.body.collectedAt),
-        status: trimmedField(req.body.status),
+        status: initialStatus,
         resultData: chainResultData,
       },
       { peerName }
@@ -517,6 +567,80 @@ app.get('/api/records/:resultId/resolve-data', async (req, res, next) => {
       ...response,
       resolved: true,
       ipfs: ipfsPayload,
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.get('/api/governance/rules', (_req, res) => {
+  res.json({
+    agentId: 'governance-agent',
+    owner: 'Adarsh (Aadarsh Sharma)',
+    role: 'System Guardrails & Output Validation',
+    status: 'active',
+    decisions: Object.values(DECISION),
+    confidenceLevels: CONFIDENCE_LEVELS,
+    preGuardrails: PRE_GUARDRAILS.map((r) => ({
+      id: r.id,
+      severity: r.severity,
+      description: r.description,
+      patternsCount: r.patterns.length,
+    })),
+    postGuardrails: POST_GUARDRAILS.map((r) => ({
+      id: r.id,
+      severity: r.severity,
+      description: r.description,
+      patternsCount: r.patterns.length,
+    })),
+  });
+});
+
+app.post('/api/governance/screen', (req, res, next) => {
+  try {
+    const { text, ai, rawInputs, context, meta = {} } = req.body || {};
+
+    if (context && typeof context === 'object') {
+      const result = runGovernanceAgent(context);
+      return res.json({ ok: true, ...result });
+    }
+
+    if (ai && typeof ai === 'object') {
+      const result = reviewLegacyAiOutput(ai, {
+        runId: meta.runId || `GOV-${Date.now()}`,
+        patientId: meta.patientId || 'patient-test',
+        rawInputs: rawInputs || meta.rawInputs || {},
+      });
+      return res.json({ ok: true, ...result });
+    }
+
+    // Direct text screening helper
+    const testText = String(text || '').trim();
+    if (!testText) {
+      throw new Error('Provide text, ai object, or context object to screen.');
+    }
+
+    const preViolations = runPreGuardrails({ reportText: testText });
+    const syntheticResult = {
+      agentId: 'screening-input',
+      status: 'success',
+      confidence: 'medium',
+      output: { summary: testText, recommendation: testText },
+    };
+    const postViolations = runPostGuardrails(syntheticResult);
+    const result = runGovernanceAgent({
+      runId: meta.runId || `TEXT-${Date.now()}`,
+      patientId: meta.patientId || 'patient-screening',
+      input: { rawInputs: { reportText: testText } },
+      previousResults: [syntheticResult],
+    });
+
+    res.json({
+      ok: true,
+      testedText: testText,
+      preViolations,
+      postViolations,
+      governance: result.output,
     });
   } catch (error) {
     next(error);

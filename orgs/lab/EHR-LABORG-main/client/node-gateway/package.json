@@ -7,7 +7,11 @@
   "type": "commonjs",
   "scripts": {
     "start": "node index.js",
-    "web": "node server.js"
+    "web": "node server.js",
+    "test": "node --test agents/__tests__/*.test.js",
+    "test:governance": "node --test agents/__tests__/governance-agent.test.js",
+    "test:integration": "node --test agents/__tests__/governance-integration.test.js",
+    "demo:governance": "node agents/demo-governance.js"
   },
   "dependencies": {
     "@grpc/grpc-js": "^1.10.0",

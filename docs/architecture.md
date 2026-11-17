@@ -48,6 +48,7 @@ flowchart TB
 3. Fabric peers share the configured `ehrchannel`; current organization IDs are `HospitalMSP`, `DiagnosticsMSP`, and `ProviderMSP`. The root startup script starts existing Fabric services, but does not enroll identities, reinitialize a channel, or deploy chaincode.
 4. The optional dashboard observes committed Fabric blocks and configured HTTP health endpoints. Its event cache is local NDJSON. Other services must send events to `/internal/events` using the service key; that route is not exposed by Nginx.
 5. The dashboard API supplies role-filtered REST results and WebSocket/SSE events. It does not write to Fabric. Mock events are synthetic, explicitly marked, and separate from real-source status.
+6. The Lab Gateway (`:3006`, `/lab/`) includes the deterministic Governance / AI Safety Agent (`agents/governance-agent.js`), intercepting AI model outputs to enforce prompt injection screening, eliminate definitive diagnostic claims, and gate unvalidated outputs to `PENDING_REVIEW` before committing to the Fabric ledger.
 6. The pharmacy UI/API are kept independent. Current pharmacy configuration is not aligned with the active hospital Fabric topology, so ledger-backed pharmacy actions must be shown as unavailable until the owning team supplies the matching integration.
 
 ## Trust and data boundaries
