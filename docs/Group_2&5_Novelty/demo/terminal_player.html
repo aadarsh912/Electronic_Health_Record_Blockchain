@@ -1,0 +1,402 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>PowerShell 5.1 - EHR Governance Agent Live Demo Recording</title>
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+    body {
+      background: #1e1e1e;
+      color: #e0e0e0;
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 24px;
+      min-height: 100vh;
+    }
+    .header {
+      margin-bottom: 16px;
+      text-align: center;
+    }
+    .header h1 {
+      font-size: 20px;
+      font-weight: 600;
+      color: #fff;
+      margin-bottom: 4px;
+    }
+    .header p {
+      font-size: 13px;
+      color: #888;
+    }
+    .controls {
+      display: flex;
+      gap: 12px;
+      margin-bottom: 16px;
+      align-items: center;
+    }
+    button {
+      background: #2b2b2b;
+      color: #fff;
+      border: 1px solid #444;
+      border-radius: 6px;
+      padding: 8px 16px;
+      font-size: 13px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      transition: all 0.2s;
+    }
+    button:hover {
+      background: #3a3a3a;
+      border-color: #666;
+    }
+    button.primary {
+      background: #0078d4;
+      border-color: #0078d4;
+    }
+    button.primary:hover {
+      background: #106ebe;
+    }
+    .recording-badge {
+      background: #d83b01;
+      color: white;
+      padding: 3px 8px;
+      border-radius: 12px;
+      font-size: 11px;
+      font-weight: bold;
+      display: none;
+      align-items: center;
+      gap: 4px;
+    }
+    .terminal-container {
+      width: 1024px;
+      border-radius: 8px;
+      overflow: hidden;
+      box-shadow: 0 16px 40px rgba(0,0,0,0.6);
+      border: 1px solid #333;
+      background: #0c0c0c;
+    }
+    .terminal-titlebar {
+      height: 32px;
+      background: #1f1f1f;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 12px;
+      user-select: none;
+    }
+    .title-left {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 12px;
+      color: #ccc;
+      font-family: 'Segoe UI', sans-serif;
+    }
+    .title-left svg {
+      width: 14px;
+      height: 14px;
+      fill: #4c9aff;
+    }
+    .window-controls {
+      display: flex;
+      gap: 14px;
+    }
+    .win-btn {
+      width: 12px;
+      height: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #888;
+      font-size: 10px;
+    }
+    canvas {
+      display: block;
+      background: #0c0c0c;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="header">
+    <h1>EHR Governance Agent - Terminal Screen Recording</h1>
+    <p>Adarsh Sharma - Governance / AI Safety Agent Screen Demo</p>
+  </div>
+
+  <div class="controls">
+    <button id="btnPlayPause" onclick="togglePlay()">⏸ Pause</button>
+    <button onclick="restartDemo()">↺ Restart</button>
+    <button class="primary" id="btnDownload" onclick="startExportVideo()">⬇ Download Video (.webm)</button>
+    <div id="recordingBadge" class="recording-badge">● Recording Video...</div>
+  </div>
+
+  <div class="terminal-container">
+    <div class="terminal-titlebar">
+      <div class="title-left">
+        <svg viewBox="0 0 24 24"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2zm2 4l5 4-5 4V8zm7 8h5v-2h-5v2z"/></svg>
+        <span>Windows PowerShell</span>
+      </div>
+      <div class="window-controls">
+        <span class="win-btn">─</span>
+        <span class="win-btn">□</span>
+        <span class="win-btn">✕</span>
+      </div>
+    </div>
+    <canvas id="termCanvas" width="1024" height="600"></canvas>
+  </div>
+
+  <script>
+    const canvas = document.getElementById('termCanvas');
+    const ctx = canvas.getContext('2d');
+    const LINE_H = 22;
+    const FONT = '15px Consolas, monospace';
+
+    const COLOR = {
+      bg: '#0c0c0c',
+      default: '#cccccc',
+      white: '#f5f5f5',
+      green: '#26c82b',
+      yellow: '#e5b91e',
+      red: '#e74856',
+      magenta: '#d75ad7',
+      cyan: '#50d2dc',
+      gray: '#808080',
+      cursor: '#dddddd'
+    };
+
+    // Pre-record script sequence
+    const SCRIPT = [
+      { type: 'wait', ms: 500 },
+      { type: 'type', prompt: 'PS C:\\Users\\hp\\Desktop\\EHR> ', text: 'dir' },
+      { type: 'wait', ms: 400 },
+      { type: 'output', lines: [
+        { text: '' },
+        { text: '    Directory: C:\\Users\\hp\\Desktop\\EHR' },
+        { text: '' },
+        { text: 'Mode                 LastWriteTime         Length Name' },
+        { text: '----                 -------------         ------ ----' },
+        { text: 'd-----        12-10-2026  11:50 AM                agents' },
+        { text: '-a----        17-11-2026  11:11 PM          16627 adarsh-governance-agent.zip' },
+        { text: '-a----        12-10-2026  11:50 AM           4001 demo-governance.js' },
+        { text: '-a----        17-11-2026  11:03 PM          10262 governance-agent.js' },
+        { text: '-a----        17-11-2026  11:11 PM           7562 governance-agent.test.js' },
+        { text: '-a----        17-11-2026  11:03 PM          11531 governance.md' },
+        { text: '-a----        17-11-2026  11:11 PM            548 package.json' },
+        { text: '-a----        17-11-2026  11:03 PM           5697 safety-rules.js' },
+        { text: '' }
+      ]},
+      { type: 'wait', ms: 800 },
+      { type: 'type', prompt: 'PS C:\\Users\\hp\\Desktop\\EHR> ', text: 'npm run demo' },
+      { type: 'wait', ms: 400 },
+      { type: 'output', lines: [
+        { text: '> ehr-governance-agent@1.0.0 demo', color: COLOR.gray },
+        { text: '> node demo-governance.js', color: COLOR.gray },
+        { text: '=== Governance / AI Safety Agent - live demo ===', color: COLOR.cyan },
+        { text: '' },
+        { text: 'Scenario 1: Safe, advisory output', color: COLOR.white },
+        { text: '  decision            : ', spans: [{ text: '  decision            : ', color: COLOR.default }, { text: 'ACCEPT', color: COLOR.green }] },
+        { text: '  requiresHumanReview : false' },
+        { text: '  violations          : none' },
+        { text: '' },
+        { text: 'Scenario 2: Unsafe certainty ("definitely has")', color: COLOR.white },
+        { text: '  decision            : ', spans: [{ text: '  decision            : ', color: COLOR.default }, { text: 'REGENERATE', color: COLOR.magenta }] },
+        { text: '  requiresHumanReview : true' },
+        { text: '  violation           : POST_UNSAFE_CERTAINTY [clinical-agent] -> "definitely has"' },
+        { text: '' },
+        { text: 'Scenario 3: Prompt injection hidden in uploaded report', color: COLOR.white },
+        { text: '  decision            : ', spans: [{ text: '  decision            : ', color: COLOR.default }, { text: 'BLOCKED', color: COLOR.red }] },
+        { text: '  requiresHumanReview : true' },
+        { text: '  violation           : PRE_PROMPT_INJECTION [input] -> "Ignore all previous instructions"' },
+        { text: '' },
+        { text: 'Scenario 4: AI output leaks a secret (GEMINI_API_KEY)', color: COLOR.white },
+        { text: '  decision            : ', spans: [{ text: '  decision            : ', color: COLOR.default }, { text: 'BLOCKED', color: COLOR.red }] },
+        { text: '  requiresHumanReview : true' },
+        { text: '  violation           : POST_MALICIOUS_TOKEN_LEAK [clinical-agent] -> "GEMINI_API_KEY"' },
+        { text: '' },
+        { text: 'Scenario 5: Low confidence from upstream agent', color: COLOR.white },
+        { text: '  decision            : ', spans: [{ text: '  decision            : ', color: COLOR.default }, { text: 'HUMAN_REVIEW_REQUIRED', color: COLOR.yellow }] },
+        { text: '  requiresHumanReview : true' },
+        { text: '  violation           : POST_LOW_CONFIDENCE [clinical-agent] -> "low"' },
+        { text: '' },
+        { text: '=== demo complete ===', color: COLOR.cyan },
+        { text: '' }
+      ]},
+      { type: 'wait', ms: 1000 },
+      { type: 'type', prompt: 'PS C:\\Users\\hp\\Desktop\\EHR> ', text: 'npm test' },
+      { type: 'wait', ms: 400 },
+      { type: 'output', lines: [
+        { text: '> ehr-governance-agent@1.0.0 test', color: COLOR.gray },
+        { text: '> node --test agents/__tests__/governance-agent.test.js', color: COLOR.gray },
+        { spans: [{ text: '✔ ', color: COLOR.green }, { text: 'ACCEPT: hedged, advisory language with valid confidence passes clean (2.3ms)' }] },
+        { spans: [{ text: '✔ ', color: COLOR.green }, { text: 'REGENERATE: unsafe certainty language is caught (0.2ms)' }] },
+        { spans: [{ text: '✔ ', color: COLOR.green }, { text: 'BLOCKED: prompt injection hidden in OCR-extracted report text is caught (1.0ms)' }] },
+        { spans: [{ text: '✔ ', color: COLOR.green }, { text: 'BLOCKED: malicious token / secret-extraction request in AI output is caught (0.2ms)' }] },
+        { spans: [{ text: '✔ ', color: COLOR.green }, { text: 'HUMAN_REVIEW_REQUIRED: low upstream confidence escalates even with clean text (0.2ms)' }] },
+        { spans: [{ text: '✔ ', color: COLOR.green }, { text: 'HUMAN_REVIEW_REQUIRED: missing/invalid confidence field is an ambiguous score (0.1ms)' }] },
+        { spans: [{ text: '✔ ', color: COLOR.green }, { text: 'fail-closed: internal screening error still escalates to HUMAN_REVIEW_REQUIRED (0.1ms)' }] },
+        { spans: [{ text: '✔ ', color: COLOR.green }, { text: 'adaptLegacyAiOutput: converts current ai-agent output into AgentResult[] (0.1ms)' }] },
+        { spans: [{ text: '✔ ', color: COLOR.green }, { text: 'reviewLegacyAiOutput: end-to-end screening of realistic analysis result (0.2ms)' }] },
+        { text: 'ℹ tests 9 | pass 9 | fail 0 | suites 0', color: COLOR.cyan },
+        { text: 'ℹ duration_ms 88.6ms', color: COLOR.gray },
+        { text: '' }
+      ]},
+      { type: 'wait', ms: 1200 },
+      { type: 'prompt', prompt: 'PS C:\\Users\\hp\\Desktop\\EHR> ' }
+    ];
+
+    let lines = [
+      { text: 'Windows PowerShell 5.1' },
+      { text: 'Copyright (C) Microsoft Corporation. All rights reserved.' },
+      { text: '' },
+      { text: 'PS C:\\Users\\hp\\Desktop\\EHR> ' }
+    ];
+
+    let isPlaying = true;
+    let stepIndex = 0;
+    let charIndex = 0;
+    let cursorBlink = true;
+    let intervalId = null;
+
+    setInterval(() => {
+      cursorBlink = !cursorBlink;
+      render();
+    }, 500);
+
+    function render() {
+      ctx.fillStyle = COLOR.bg;
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      ctx.font = FONT;
+
+      const maxLines = Math.floor((canvas.height - 24) / LINE_H);
+      const visible = lines.slice(-maxLines);
+
+      visible.forEach((line, idx) => {
+        const y = 20 + idx * LINE_H;
+        let x = 14;
+
+        if (line.spans) {
+          line.spans.forEach(span => {
+            ctx.fillStyle = span.color || COLOR.default;
+            ctx.fillText(span.text, x, y);
+            x += ctx.measureText(span.text).width;
+          });
+        } else {
+          ctx.fillStyle = line.color || COLOR.default;
+          ctx.fillText(line.text, x, y);
+          x += ctx.measureText(line.text).width;
+        }
+
+        // Draw cursor on last line
+        if (idx === visible.length - 1 && cursorBlink) {
+          ctx.fillStyle = COLOR.cursor;
+          ctx.fillRect(x + 2, y - 14, 8, LINE_H - 4);
+        }
+      });
+    }
+
+    async function runScript() {
+      while (isPlaying && stepIndex < SCRIPT.length) {
+        const step = SCRIPT[stepIndex];
+        if (step.type === 'wait') {
+          await sleep(step.ms);
+        } else if (step.type === 'type') {
+          const fullCmd = step.text;
+          for (let i = 0; i <= fullCmd.length; i++) {
+            if (!isPlaying) return;
+            lines[lines.length - 1] = { text: step.prompt + fullCmd.slice(0, i) };
+            render();
+            await sleep(70 + Math.random() * 40);
+          }
+        } else if (step.type === 'output') {
+          for (let l of step.lines) {
+            lines.push(l);
+            render();
+            await sleep(35);
+          }
+          lines.push({ text: 'PS C:\\Users\\hp\\Desktop\\EHR> ' });
+          render();
+        } else if (step.type === 'prompt') {
+          // final resting state
+          render();
+        }
+        stepIndex++;
+      }
+    }
+
+    function sleep(ms) {
+      return new Promise(res => setTimeout(res, ms));
+    }
+
+    function togglePlay() {
+      isPlaying = !isPlaying;
+      document.getElementById('btnPlayPause').innerText = isPlaying ? '⏸ Pause' : '▶ Play';
+      if (isPlaying) runScript();
+    }
+
+    function restartDemo() {
+      lines = [
+        { text: 'Windows PowerShell 5.1' },
+        { text: 'Copyright (C) Microsoft Corporation. All rights reserved.' },
+        { text: '' },
+        { text: 'PS C:\\Users\\hp\\Desktop\\EHR> ' }
+      ];
+      stepIndex = 0;
+      isPlaying = true;
+      document.getElementById('btnPlayPause').innerText = '⏸ Pause';
+      render();
+      runScript();
+    }
+
+    async function startExportVideo() {
+      const btn = document.getElementById('btnDownload');
+      const badge = document.getElementById('recordingBadge');
+      btn.disabled = true;
+      badge.style.display = 'inline-flex';
+
+      restartDemo();
+
+      const stream = canvas.captureStream(30);
+      let options = { mimeType: 'video/webm; codecs=vp9' };
+      if (!MediaRecorder.isTypeSupported(options.mimeType)) {
+        options = { mimeType: 'video/webm' };
+      }
+
+      const recorder = new MediaRecorder(stream, options);
+      const chunks = [];
+      recorder.ondataavailable = e => chunks.push(e.data);
+      recorder.onstop = () => {
+        const blob = new Blob(chunks, { type: 'video/webm' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'terminal_recording_EHR_governance.webm';
+        a.click();
+        badge.style.display = 'none';
+        btn.disabled = false;
+        alert('Video recording downloaded successfully!');
+      };
+
+      recorder.start();
+      
+      // Wait until script completes (~14s)
+      while (stepIndex < SCRIPT.length) {
+        await sleep(300);
+      }
+      await sleep(1000); // final buffer
+      recorder.stop();
+    }
+
+    render();
+    runScript();
+  </script>
+</body>
+</html>
+

@@ -5,6 +5,7 @@ const readForm = document.getElementById('readForm');
 const resolveDataForm = document.getElementById('resolveDataForm');
 const patientForm = document.getElementById('patientForm');
 const updateStatusForm = document.getElementById('updateStatusForm');
+const governanceForm = document.getElementById('governanceForm');
 const recordsBody = document.getElementById('recordsBody');
 const metaPill = document.getElementById('metaPill');
 const rawOutput = document.getElementById('rawOutput');
@@ -83,6 +84,7 @@ function normalizeToArray(result) {
 function getStatusStyle(status) {
   const s = String(status || '').toUpperCase();
   if (s === 'PENDING') return 'background: #fdf0de; color: #8a4a1f; border: 1px solid #efcba5;';
+  if (s === 'PENDING_REVIEW') return 'background: #fff3cd; color: #856404; border: 1px solid #ffeeba; font-weight: 600;';
   if (s === 'REPORTED') return 'background: #e5f6ee; color: #1d6b43; border: 1px solid #b7dfcb;';
   if (s === 'ERROR') return 'background: #fdeaea; color: #9e2d2d; border: 1px solid #f3b3b3;';
   return 'background: #e8efec; color: #4b6359; border: 1px solid #c7d6cf;';
@@ -286,6 +288,7 @@ createForm.addEventListener('submit', async (event) => {
       collectedAt: isoDateString,
       status: String(form.get('status') || '').trim(),
       runAiAgents: form.get('runAiAgents') === 'on',
+      runGovernance: form.get('runGovernance') === 'on',
     };
 
     const useIpfs = form.get('storeInIpfs') === 'on';
@@ -300,6 +303,7 @@ createForm.addEventListener('submit', async (event) => {
       multipartPayload.append('collectedAt', payload.collectedAt);
       multipartPayload.append('status', payload.status);
       multipartPayload.append('runAiAgents', String(payload.runAiAgents));
+      multipartPayload.append('runGovernance', String(payload.runGovernance));
 
       if (parsedData !== null) {
         multipartPayload.append('resultData', JSON.stringify(parsedData));
@@ -433,6 +437,31 @@ updateStatusForm.addEventListener('submit', async (event) => {
     toggleLoading(btn, false);
   }
 });
+
+if (governanceForm) {
+  governanceForm.addEventListener('submit', async (event) => {
+    event.preventDefault();
+    const btn = governanceForm.querySelector('button[type="submit"]');
+    toggleLoading(btn, true);
+
+    try {
+      const text = String(new FormData(governanceForm).get('testText') || '').trim();
+      const response = await apiRequest('/api/governance/screen', {
+        method: 'POST',
+        body: JSON.stringify({ text }),
+      });
+
+      setOutput('POST /api/governance/screen', response);
+      const decision = response.governance ? response.governance.decision : 'UNKNOWN';
+      const humanReview = response.governance ? response.governance.requiresHumanReview : false;
+      showToast(`Governance Gate: ${decision} (Review Required: ${humanReview})`);
+    } catch (error) {
+      showToast(error.message);
+    } finally {
+      toggleLoading(btn, false);
+    }
+  });
+}
 
 clearOutputBtn.addEventListener('click', () => {
   rawOutput.innerHTML = '<span style="color: var(--text-muted);">Awaiting transactions...</span>';
